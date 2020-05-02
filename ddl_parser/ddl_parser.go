@@ -1,6 +1,8 @@
 package main
 
+import "C"
 import (
+	"encoding/json"
 	"github.com/pingcap/parser"
 	"github.com/pingcap/parser/ast"
 	"github.com/pingcap/parser/format"
@@ -9,6 +11,26 @@ import (
 )
 
 func main() {}
+
+//export Parse
+func Parse(sql string) *C.char {
+	return toCGOReturn(parse(sql))
+}
+
+func toCGOReturn(parseResults []*ParseResult) (*C.char) {
+	var results []*ReturnResult
+	for _, r := range parseResults {
+		results = append(results, r.toReturnResult())
+	}
+
+	jsonStr, _ := json.Marshal(results)
+	return stringToCString(string(jsonStr))
+}
+
+func stringToCString(str string) *C.char {
+	cs := C.CString(str)
+	return cs
+}
 
 type ReturnResult struct {
 	SQL      string            `json:"sql"`
