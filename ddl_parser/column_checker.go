@@ -3,7 +3,8 @@ package main
 import (
 	"github.com/pingcap/parser/ast"
 	"github.com/pingcap/parser/mysql"
-	"github.com/pingcap/tidb/types"
+	"github.com/pingcap/parser/types"
+	driver "github.com/pingcap/tidb/types/parser_driver"
 	"strings"
 )
 
@@ -120,7 +121,7 @@ func checkColUpdatedAtDef(r *ParseResult, col *ast.ColumnDef) {
 //    2: No inline key declaration. All Primary/Unique/Reference key must use INDEX line
 //    3: Use `DATETIME` instead of `TIMESTAMP`
 //    4: Don't specify a display length for BIGINT, INT, MEDIUMINT, SMALLINT, and TINYINT etc.
-//    5: Don't use 'DEFAULT' for TEXT, JSON, BLOB (LARGE OBJECT) data type
+//    5: Don't use non-null default value for JSON, TEXT, BLOB (LARGE OBJECT), SPATIAL data type
 //    6: Don't use ENUM fields for storing input
 //    7: Don't use reserved keyword for column name
 //    8: Don't use upper case for column name
@@ -139,17 +140,24 @@ func checkColDef(r *ParseResult, col *ast.ColumnDef, ddlType string) {
 		r.AddError(ColNameNotLowerCaseErr.Accept(colName))
 	}
 
-	hasNotNull, hasDefault, canSkipDefault, autoIncSet := false, false, false, false
+	hasNotNull, hasDefault, defaultNull, canSkipDefault, autoIncSet := false, false, false, false, false
 	for _, option := range col.Options {
 		if option.Tp == ast.ColumnOptionPrimaryKey || option.Tp == ast.ColumnOptionUniqKey || option.Tp == ast.ColumnOptionReference { // Rule 2
 			r.AddError(ColInlineKeyErr.Accept(colName))
 		} else if option.Tp == ast.ColumnOptionDefaultValue {
 			hasDefault = true
+			if expr, ok := option.Expr.(*driver.ValueExpr); ok {
+				defaultNull = expr.IsNull()
+			}
 		} else if option.Tp == ast.ColumnOptionNotNull {
 			hasNotNull = true
 		} else if option.Tp == ast.ColumnOptionAutoIncrement {
 			autoIncSet = true
 		}
+	}
+
+	if hasDefault && hasNotNull && defaultNull {
+		r.AddError(ColNotNullDefaultNullErr.Accept(colName))
 	}
 
 	if colInfo != nil {
@@ -160,16 +168,15 @@ func checkColDef(r *ParseResult, col *ast.ColumnDef, ddlType string) {
 			if colInfo.Tp != mysql.TypeTiny && colInfo.Flen != types.UnspecifiedLength {
 				r.AddError(ColDisplayLengthIntErr.Accept(colName))
 			}
-		} else if colInfo.Tp == mysql.TypeJSON || colInfo.Tp == mysql.TypeGeometry || types.IsTypeBlob(colInfo.Tp) {
-			if hasDefault { // Rule 5
-				r.AddError(ColDefaultBlobJsonErr.Accept(colName, types.TypeStr(colInfo.Tp)))
+		} else if colInfo.Tp == mysql.TypeJSON || types.IsTypeGeometry(colInfo.Tp) || types.IsTypeBlob(colInfo.Tp) {
+			if hasDefault && !defaultNull { // Rule 5
+				r.AddError(ColNotNullDefaultErr.Accept(colName, types.TypeStr(colInfo.Tp)))
 			}
 			canSkipDefault = true
 		} else if colInfo.Tp == mysql.TypeEnum { // Rule 6
 			r.AddError(ColEnumTypeErr.Accept(colName))
 		}
 	}
-
 
 	if ddlType == TypeAlterTable && hasNotNull && !canSkipDefault && !hasDefault && !autoIncSet { // Rule 9
 		r.AddError(ColNotNullWithoutDefaultErr.Accept(colName))

@@ -98,9 +98,10 @@ var (
 	ColNameWithHyphenErr        = NewCustomError("column `%s` contains invalid character hyphen `-`, please use `_` instead")
 	ColInlineKeyErr             = NewCustomError("column `%s` with inline `Unique/Primary/Reference/Key` is not allowed")
 	ColTimeStampTypeErr         = NewCustomError("column `%s` with `TIMESTAMP` is not allowed, use `DATETIME` instead")
-	ColDefaultBlobJsonErr       = NewCustomError("column `%s` of type `%s` with default value is not allowed")
+	ColNotNullDefaultErr        = NewCustomError("column `%s` of type `%s` with non null default value is not allowed")
 	ColDisplayLengthIntErr      = NewCustomError("column `%s` with display length is not allowed")
 	ColEnumTypeErr              = NewCustomError("column `%s` with `ENUM` is not allowed")
+	ColNotNullDefaultNullErr    = NewCustomError("use of `NOT NULL` and `DEFAULT NULL` at the same time in column `%s` is not allowed")
 	ColReservedWordErr          = NewCustomError("use of reserved word `%s` as column name is not allowed")
 	ColNameNotLowerCaseErr      = NewCustomError("use of upper case in column `%s` is not allowed")
 	ColNotNullWithoutDefaultErr = NewCustomError("column `%s` with `NOT NULL` should have `DEFAULT`")
@@ -183,10 +184,11 @@ var (
 		ColNameWithHyphenErr:           DDLMsgTypeError,
 		ColInlineKeyErr:                DDLMsgTypeError,
 		ColTimeStampTypeErr:            DDLMsgTypeError,
-		ColDefaultBlobJsonErr:          DDLMsgTypeError,
+		ColNotNullDefaultErr:           DDLMsgTypeError,
 		ColDisplayLengthIntErr:         DDLMsgTypeError,
 		ColEnumTypeErr:                 DDLMsgTypeError,
 		ColReservedWordErr:             DDLMsgTypeError,
+		ColNotNullDefaultNullErr:       DDLMsgTypeError,
 		ColNameNotLowerCaseErr:         DDLMsgTypeError,
 		ColNotNullWithoutDefaultErr:    DDLMsgTypeWarning,
 		ColReorderWithFirstErr:         DDLMsgTypeWarning,
